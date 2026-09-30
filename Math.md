@@ -24,6 +24,9 @@ files:
   - Silverbullet-Math/fonts/KaTeX_Caligraphic-Regular.woff2
   - Silverbullet-Math/fonts/KaTeX_Caligraphic-Bold.woff2
   - Silverbullet-Math/fonts/KaTeX_AMS-Regular.woff2
+share.uri: "https://github.com/MrMugame/silverbullet-math/blob/main/Math.md"
+share.hash: b4f31a7f
+share.mode: pull
 ---
 
 # Silverbullet Math
@@ -49,45 +52,70 @@ The current $\KaTeX$ version is ${latex.katex.version}.
 ## Syntax
 ```space-lua
 syntax.define {
-  name = "LatexInline",
-  startMarker = "\\$(?!\\{)",
-  endMarker = "\\$(?!\\{)",
+  name = "LatexDisplay",
+  startMarker = "\\$\\$(?!\\$)",
+  endMarker = "(?<!\\$)\\$\\$(?!\\$)",
   mode = "inline",
-  startMarkerClass = "sb-latex-mark",
-  bodyClass = "sb-latex-body",
-  endMarkerClass = "sb-latex-mark",
-  render = function(body)
-    return latex.inline(body)
+
+  startMarkerClass = "sb-latex-block-mark",
+  bodyClass = "sb-latex-block-body",
+  endMarkerClass = "sb-latex-block-mark",
+
+  renderWidget = function(body, pageName)
+    return latex.block(body)
   end
 }
 
 syntax.define {
-  name = "LatexBlock",
-  startMarker = "^\\$\\$$",
-  endMarker = "^\\$\\$$",
-  mode = "block",
-  render = function(body)
-    return latex.block(body)
+  name = "LatexInline",
+  startMarker = "(?<!\\$)\\$(?!\\$|\\{)",
+  endMarker = "(?<!\\$)\\$(?!\\$|\\{)",
+  mode = "inline",
+
+  startMarkerClass = "sb-latex-mark",
+  bodyClass = "sb-latex-body",
+  endMarkerClass = "sb-latex-mark",
+
+  renderWidget = function(body, pageName)
+    return latex.inline(body)
   end
 }
 ```
 
 ## Implementation
 ```space-lua
+local location = "Library/mrmugame/Silverbullet-Math"
+local latex_header = string.format(
+  "<link rel=\"stylesheet\" href=\".fs/%s/katex.min.css\">",
+  location)
+local latex_katex = js.import(
+  string.format("%s.fs/%s/katex.mjs",
+    system.getURLPrefix(), location))
+
 latex = {
-  katex = js.import(string.format("%s.fs/Library/mrmugame/Silverbullet-Math/katex.mjs", system.getURLPrefix()))
+  header = latex_header,
+  katex = latex_katex,
+  macros = {
+    [ [[\mdot]] ] = [[\mathbin{\scriptstyle\bullet}]],
+    [ [[\NN]] ] = [[\mathbb{N}]],
+    [ [[\ZZ]] ] = [[\mathbb{Z}]],
+    [ [[\QQ]] ] = [[\mathbb{Q}]],
+    [ [[\RR]] ] = [[\mathbb{R}]],
+    [ [[\CC]] ] = [[\mathbb{C}]],
+  }
 }
 
 function latex.inline(expression)
   local html = latex.katex.renderToString(expression, {
     trust = true,
     throwOnError = false,
-    displayMode = false
+    displayMode = false,
+    macros = latex.macros,
   })
 
   return widget.new {
     display = "inline",
-    html = html
+    html = "<span>" .. latex.header .. html .. "</span>"
   }
 end
 
@@ -95,20 +123,63 @@ function latex.block(expression)
   local html = latex.katex.renderToString(expression, {
     trust = true,
     throwOnError = false,
-    displayMode = true
+    displayMode = true,
+    macros = latex.macros,
   })
 
   return widget.new {
-    display = "block",
-    html = html
+    display = "inline",
+    html = "<span>" .. latex.header .. html .. "</span>"
   }
 end
 ```
 
 ```space-style
-@import url(".fs/Library/mrmugame/Silverbullet-Math/katex.min.css");
-
 .sb-lua-directive-inline:has(.katex-html) {
   border: none !important;
+}
+
+/* remove KaTeX's default 1em top/bottom margin */
+.katex-display {
+  margin: 0 !important;
+}
+
+/* the widget container SilverBullet renders */
+.sb-lua-directive-inline:has(.katex-display) {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  line-height: 1 !important;
+}
+
+/* the inner span; block so vertical spacing behaves */
+.sb-lua-directive-inline:has(.katex-display) > .wrapper {
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* the outer widget wrapper */
+.sb-lua-wrapper:has(.katex-display) {
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* the editor line holding the widget */
+.cm-line:has(.katex-display) {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  line-height: 1 !important;
+}
+
+/* stop every formula from resetting the counter */
+.katex {
+  counter-reset: none !important;
+}
+
+/* one shared counter for the whole page */
+.cm-content {
+  counter-reset: katexEqnNo mmlEqnNo;
 }
 ```
